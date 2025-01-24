@@ -1,0 +1,7 @@
+CREATE DATABASE IF NOT EXISTS db_sf7;
+CREATE DATABASE IF NOT EXISTS db_sf7_test;
+
+GRANT ALL PRIVILEGES ON `db_sf7`.* TO 'app'@'%'; ALTER USER 'app'@'%' ;
+GRANT ALL PRIVILEGES ON `db_sf7_test`.* TO 'app'@'%'; ALTER USER 'app'@'%' ;
+
+FLUSH PRIVILEGES;

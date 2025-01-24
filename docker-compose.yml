@@ -1,0 +1,68 @@
+services:
+  mysql:
+    environment:
+      MYSQL_ROOT_PASSWORD: ChangeRootPassword2025
+      MYSQL_USER: app
+      MYSQL_PASSWORD: ChangeUserPassword2025
+      SERVICE_NAME: mysql
+    build: ./docker/mysql/
+    container_name: sf7-mysql
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - mysql_data_api:/var/lib/mysql:delegated
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    ports: 
+      - '3306:3306'
+    networks:
+      - mysql_network
+      - sf7_api_network
+
+  phpmyadmin:
+    build: ./docker/phpmyadmin
+    container_name: sf7-phpmyadmin
+    environment:
+      PMA_HOST: sf7-mysql
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 512M
+    ports:
+      - 8080:80
+    networks:
+      - mysql_network
+
+  redis:
+    image: tgonzalez33/redis-stack
+    container_name: sf7-redis
+    tty: true
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data:delegated
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_USER=redis
+      - REDIS_PASSWORD=redis
+    networks:
+      - sf7_api_network
+
+  api:
+    container_name: sf7-api
+    image: tgonzalez33/msa-symfony-admin:xdebug
+    volumes:
+      - ./api:/var/www/html
+    ports:
+      - "8182:8182"
+    networks:
+      - sf7_api_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+# Volumes
+volumes:
+  mysql_data_api:
+  redis_data:
+  
+# Networks
+networks:
+  mysql_network:
+  sf7_api_network:

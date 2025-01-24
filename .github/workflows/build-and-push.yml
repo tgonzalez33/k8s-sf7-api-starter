@@ -1,0 +1,122 @@
+name: Workflow SF7 API
+on:
+  push:
+    branches: [main]
+
+defaults:
+ run:
+  working-directory: ./api
+
+jobs:
+  symfony:
+    name: Symfony 7 PHP 8
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4.3
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root_password_mysql
+          MYSQL_DATABASE: testdb
+          MYSQL_USER: user_mysql
+          MYSQL_PASSWORD: password_mysql
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+          --name mysql-server
+    strategy:
+      fail-fast: true
+    steps:
+      # —— Setup Github actions 🐙 —————————————————————————————————————————————
+      # https://github.com/actions/checkout (official)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Symfony
+        run: |
+          curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.deb.sh' | sudo -E bash
+          sudo apt-get update && sudo apt-get install -y symfony-cli
+
+      # https://github.com/shivammathur/setup-php (community)
+      - name: Setup PHP, extensions and composer with shivammathur/setup-php
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4' 
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, dom, filter, json, curl, amqp
+        env:
+          update: true
+
+      - name: Check PHP Version
+        run: php -v
+        
+      # —— Composer 🧙‍️ —————————————————————————————————————————————————————————
+      - name: Validate composer.json and composer.lock
+        run: composer validate
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v4
+        with:
+          path: "./api/vendor"
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+      - name: Wait for MySQL to be ready
+        run: |
+          echo "Waiting for MySQL to be ready..."
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -u user_mysql -ppassword_mysql --silent; then
+              echo "MySQL is ready!"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "MySQL did not become ready in time!"
+          exit 1
+
+      # —— Symfony 🎵 ——————————————————————————————————————————————————————————
+      - name: Prepare .env file
+        run: |
+          echo "APP_ENV=${{ vars.APP_ENV }}" >> .env
+          echo "APP_DEBUG=${{ vars.APP_DEBUG }}" >> .env
+          echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "CORS_ALLOW_ORIGIN=${{ secrets.CORS_ALLOW_ORIGIN }}" >> .env 
+          echo "DATABASE_URL=mysql://user_mysql:password_mysql@127.0.0.1:3306/testdb?serverVersion=8.4.3&charset=utf8mb4" >> .env.local
+          
+      - name: Check Symfony requirements
+        run: symfony check:requirements
+          
+      - name: Check the Symfony version and environnements
+        run: php bin/console --version
+      
+      - name: Run database migrations
+        run: php bin/console doctrine:migrations:migrate --no-interaction
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        
+      - name: Build Docker image with secrets
+        run: |
+            DOCKER_REPO_PATH=${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPOSITORY }}
+            docker build -t $DOCKER_REPO_PATH:latest -t $DOCKER_REPO_PATH:${{ github.sha }} .
+            # Remove .env* files before pushing image
+            rm -f .env*
+            docker push $DOCKER_REPO_PATH:latest
+            docker push $DOCKER_REPO_PATH:${{ github.sha }}
+
+      - name: Log out from DockerHub
+        run: |
+            docker logout

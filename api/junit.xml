@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/var/www/html/phpunit.xml.dist" tests="2" assertions="7" errors="0" failures="0" skipped="0" time="0.274292">
+    <testsuite name="Project Test Suite" tests="2" assertions="7" errors="0" failures="0" skipped="0" time="0.274292">
+      <testsuite name="App\Tests\Unit\JwtGenerationTest" file="/var/www/html/tests/Unit/JwtGenerationTest.php" tests="1" assertions="4" errors="0" failures="0" skipped="0" time="0.010910">
+        <testcase name="testDecodeJWT" file="/var/www/html/tests/Unit/JwtGenerationTest.php" line="14" class="App\Tests\Unit\JwtGenerationTest" classname="App.Tests.Unit.JwtGenerationTest" assertions="4" time="0.010910"/>
+      </testsuite>
+      <testsuite name="App\Tests\Unit\UserCreationTest" file="/var/www/html/tests/Unit/UserCreationTest.php" tests="1" assertions="3" errors="0" failures="0" skipped="0" time="0.263383">
+        <testcase name="testCreateUser" file="/var/www/html/tests/Unit/UserCreationTest.php" line="35" class="App\Tests\Unit\UserCreationTest" classname="App.Tests.Unit.UserCreationTest" assertions="3" time="0.263383"/>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>
