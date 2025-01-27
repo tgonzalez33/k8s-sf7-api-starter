@@ -16,23 +16,21 @@ jobs:
       mysql:
         image: mysql:${{ vars.MYSQL_VERSION }}
         ports:
-          - ${{ vars.MYSQL_PORT }}:${{ vars.MYSQL_PORT }}
+          - "${{ vars.MYSQL_PORT }}:${{ vars.MYSQL_PORT }}"
         env:
           MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DB_TEST }}
         options: >-
           --health-cmd="mysqladmin ping -h localhost --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-        volumes:
-          - ./../docker/mysql/init:/docker-entrypoint-initdb.d
     strategy:
       fail-fast: true
     steps:
       # —— Setup Github actions 🐙 —————————————————————————————————————————————
-      # https://github.com/actions/checkout (official)
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -68,7 +66,7 @@ jobs:
 
       - name: Install Dependencies
         run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
-
+ 
       # —— Symfony 🎵 ——————————————————————————————————————————————————————————
       - name: Prepare .env file
         run: |
@@ -80,8 +78,8 @@ jobs:
           echo "CORS_ALLOW_ORIGIN='${{ secrets.CORS_ALLOW_ORIGIN }}'" >> .env.test 
           echo "KERNEL_CLASS='${{ vars.KERNEL_CLASS }}'" >> .env.test
           echo "SYMFONY_DEPRECATIONS_HELPER=${{ vars.SYMFONY_DEPRECATIONS_HELPER }}" >> .env.test
-          echo "PANTHER_APP_ENV='${{ vars.PANTHER_APP_ENV }}'" >> .env.test
-          echo "PANTHER_ERROR_SCREENSHOT_DIR='${{ vars.PANTHER_ERROR_SCREENSHOT_DIR }}'" >> .env.test
+          echo "PANTHER_APP_ENV=${{ vars.PANTHER_APP_ENV }}" >> .env.test
+          echo "PANTHER_ERROR_SCREENSHOT_DIR=${{ vars.PANTHER_ERROR_SCREENSHOT_DIR }}" >> .env.test
          
       - name: Set up MySQL environment
         env:
@@ -89,20 +87,20 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT: ${{ vars.MYSQL_PORT }}
-          MYSQL_DB: ${{ secrets.MYSQL_DB }}
+          MYSQL_DB: "${{ secrets.MYSQL_DB }}"
           MYSQL_VERSION: ${{ vars.MYSQL_VERSION }}
           MYSQL_CHARSET: ${{ vars.MYSQL_CHARSET }}
         run: |
           echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DB?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> .env.test
-
+          
       - name: Check Symfony requirements
         run: symfony check:requirements
           
       - name: Check the Symfony version and environnements
-        run: php bin/console --version
+        run: php bin/console --env=${{ vars.APP_ENV }} --version
       
       - name: Run database migrations
-        run: php bin/console doctrine:migrations:migrate --env=test --no-interaction
+        run: php bin/console doctrine:migrations:migrate --env=${{ vars.APP_ENV }} --no-interaction
 
       - name: Static analysis of PHP code (PHPStan)
         run: |
@@ -122,7 +120,40 @@ jobs:
       - name: Archive test artifact
         uses: actions/upload-artifact@v4
         with:
-          name: $(basename $PWD)-${{ job.environment }}-${{ github.run_id }}-artifact
+          name: $(basename $PWD)-${{ vars.APP_ENV }}-${{ github.run_id }}-artifact
           path: .
           retention-days: 1
-          
+
+  deploy:
+    needs: [symfony_tests]
+    environment: production
+    name: Symfony prod and deployment
+    runs-on: ubuntu-latest          
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: $(basename $PWD)-${{ vars.ARTIFACT_ENV }}-${{ github.run_id }}-artifact
+          path: .
+
+      - name: Remove dev dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --no-dev --optimize-autoloader
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        
+      - name: Build Docker image without .env
+        run: |
+          DOCKER_REPO_PATH=${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPOSITORY }}
+          docker build -t $DOCKER_REPO_PATH:latest -t $DOCKER_REPO_PATH:${{ github.sha }} .
+          docker push $DOCKER_REPO_PATH:latest
+          docker push $DOCKER_REPO_PATH:${{ github.sha }}
+
+      - name: Log out from DockerHub
+        run: |
+            docker logout
