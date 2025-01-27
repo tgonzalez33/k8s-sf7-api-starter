@@ -91,10 +91,11 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           MYSQL_PORT: ${{ vars.MYSQL_PORT }}
+          MYSQL_DB: ${{ secrets.MYSQL_DB }}
           MYSQL_VERSION: ${{ vars.MYSQL_VERSION }}
           MYSQL_CHARSET: ${{ vars.MYSQL_CHARSET }}
         run: |
-          echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MSA_NAME?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> .env.test
+          echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DB?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> .env.test
 
       - name: Check Symfony requirements
         run: symfony check:requirements
