@@ -14,19 +14,20 @@ jobs:
     name: Symfony 7 PHP 8
     services:
       mysql:
-        image: mysql:8.4.3
+        image: mysql:${{ vars.MYSQL_VERSION }}
         ports:
-          - 3306:3306
+          - ${{ vars.MYSQL_PORT }}:${{ vars.MYSQL_PORT }}
         env:
-          MYSQL_ROOT_PASSWORD: root_password_mysql
-          MYSQL_USER: app
-          MYSQL_PASSWORD: password_mysql
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
         options: >-
           --health-cmd="mysqladmin ping -h localhost --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-          --name mysql_server
+          --name $MYSQL_HOST
         volumes:
           - ./../docker/mysql/init:/docker-entrypoint-initdb.d
     strategy:
@@ -78,13 +79,23 @@ jobs:
           echo "APP_SECRET=$(openssl rand -hex 16)" >> .env.test 
           echo "JWT_SECRET='${{ secrets.JWT_SECRET }}'" >> .env.test 
           echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> .env.test 
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env.test 
           echo "CORS_ALLOW_ORIGIN='${{ secrets.CORS_ALLOW_ORIGIN }}'" >> .env.test 
           echo "KERNEL_CLASS='${{ vars.KERNEL_CLASS }}'" >> .env.test
           echo "SYMFONY_DEPRECATIONS_HELPER=${{ vars.SYMFONY_DEPRECATIONS_HELPER }}" >> .env.test
-          echo "PANTHER_APP_ENV='${{ vars.PANTHER_APP_ENV }}" >> .env.test
-          echo "PANTHER_ERROR_SCREENSHOT_DIR='${{ vars.PANTHER_ERROR_SCREENSHOT_DIR }}" >> .env.test
-           
+          echo "PANTHER_APP_ENV='${{ vars.PANTHER_APP_ENV }}'" >> .env.test
+          echo "PANTHER_ERROR_SCREENSHOT_DIR='${{ vars.PANTHER_ERROR_SCREENSHOT_DIR }}'" >> .env.test
+         
+      - name: Set up MySQL environment
+        env:
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PORT }}
+          MYSQL_VERSION: ${{ vars.MYSQL_VERSION }}
+          MYSQL_CHARSET: ${{ vars.MYSQL_CHARSET }}
+        run: |
+          echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MSA_NAME?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> .env.test
+
       - name: Check Symfony requirements
         run: symfony check:requirements
           
