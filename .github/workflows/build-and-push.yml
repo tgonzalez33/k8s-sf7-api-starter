@@ -28,7 +28,7 @@ jobs:
           --health-retries=3
           --name mysql-server
         volumes:
-          - ./docker/mysql/init:/docker-entrypoint-initdb.d
+          - docker/mysql/init:/docker-entrypoint-initdb.d
     strategy:
       fail-fast: true
     steps:
