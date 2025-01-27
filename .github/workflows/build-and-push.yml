@@ -8,9 +8,10 @@ defaults:
   working-directory: ./api
 
 jobs:
-  symfony:
-    name: Symfony 7 PHP 8
+  symfony_tests:
     runs-on: ubuntu-latest
+    environment: test
+    name: Symfony 7 PHP 8
     services:
       mysql:
         image: mysql:8.4.3
@@ -18,8 +19,7 @@ jobs:
           - 3306:3306
         env:
           MYSQL_ROOT_PASSWORD: root_password_mysql
-          MYSQL_DATABASE: testdb
-          MYSQL_USER: user_mysql
+          MYSQL_USER: app
           MYSQL_PASSWORD: password_mysql
         options: >-
           --health-cmd="mysqladmin ping -h localhost --silent"
@@ -27,6 +27,8 @@ jobs:
           --health-timeout=5s
           --health-retries=3
           --name mysql-server
+        volumes:
+          - ./docker/mysql/init:/docker-entrypoint-initdb.d
     strategy:
       fail-fast: true
     steps:
@@ -60,7 +62,7 @@ jobs:
         id: composer-cache
         uses: actions/cache@v4
         with:
-          path: "./api/vendor"
+          path: "$PWD/vendor"
           key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
             ${{ runner.os }}-php-
@@ -68,31 +70,21 @@ jobs:
       - name: Install Dependencies
         run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
 
-      - name: Wait for MySQL to be ready
-        run: |
-          echo "Waiting for MySQL to be ready..."
-          for i in {1..30}; do
-            if mysqladmin ping -h 127.0.0.1 -u user_mysql -ppassword_mysql --silent; then
-              echo "MySQL is ready!"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "MySQL did not become ready in time!"
-          exit 1
-
       # —— Symfony 🎵 ——————————————————————————————————————————————————————————
       - name: Prepare .env file
         run: |
-          echo "APP_ENV=${{ vars.APP_ENV }}" >> .env
-          echo "APP_DEBUG=${{ vars.APP_DEBUG }}" >> .env
-          echo "APP_SECRET=${{ secrets.APP_SECRET }}" >> .env
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-          echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> .env
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
-          echo "CORS_ALLOW_ORIGIN=${{ secrets.CORS_ALLOW_ORIGIN }}" >> .env 
-          echo "DATABASE_URL=mysql://user_mysql:password_mysql@127.0.0.1:3306/testdb?serverVersion=8.4.3&charset=utf8mb4" >> .env.local
-          
+          echo "APP_ENV=${{ vars.APP_ENV }}" >> .env.test
+          echo "APP_DEBUG=${{ vars.APP_DEBUG }}" >> .env.test 
+          echo "APP_SECRET=$(openssl rand -hex 16)" >> .env.test 
+          echo "JWT_SECRET='${{ secrets.JWT_SECRET }}'" >> .env.test 
+          echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> .env.test 
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env.test 
+          echo "CORS_ALLOW_ORIGIN='${{ secrets.CORS_ALLOW_ORIGIN }}'" >> .env.test 
+          echo "KERNEL_CLASS='${{ vars.KERNEL_CLASS }}'" >> .env.test
+          echo "SYMFONY_DEPRECATIONS_HELPER=${{ vars.SYMFONY_DEPRECATIONS_HELPER }}" >> .env.test
+          echo "PANTHER_APP_ENV='${{ vars.PANTHER_APP_ENV }}" >> .env.test
+          echo "PANTHER_ERROR_SCREENSHOT_DIR='${{ vars.PANTHER_ERROR_SCREENSHOT_DIR }}" >> .env.test
+           
       - name: Check Symfony requirements
         run: symfony check:requirements
           
@@ -100,23 +92,27 @@ jobs:
         run: php bin/console --version
       
       - name: Run database migrations
-        run: php bin/console doctrine:migrations:migrate --no-interaction
+        run: php bin/console doctrine:migrations:migrate --env=test --no-interaction
 
-      - name: Log in to DockerHub
-        uses: docker/login-action@v3
+      - name: Static analysis of PHP code (PHPStan)
+        run: |
+          ./vendor/bin/phpstan analyse --configuration=phpstan.dist.neon --memory-limit=512M
+        continue-on-error: true
+      
+      ## —— Tests ✅ ———————————————————————————————————————————————————————————
+      - name: Run functionnal and unit tests
+        run: |
+          ./vendor/bin/phpunit
+
+      # —— Artifact ——————————————————————————————————————————————————————————
+      - name: Delete .env
+        run: |
+          rm -f .env.test
+
+      - name: Archive test artifact
+        uses: actions/upload-artifact@v4
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-        
-      - name: Build Docker image with secrets
-        run: |
-            DOCKER_REPO_PATH=${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPOSITORY }}
-            docker build -t $DOCKER_REPO_PATH:latest -t $DOCKER_REPO_PATH:${{ github.sha }} .
-            # Remove .env* files before pushing image
-            rm -f .env*
-            docker push $DOCKER_REPO_PATH:latest
-            docker push $DOCKER_REPO_PATH:${{ github.sha }}
-
-      - name: Log out from DockerHub
-        run: |
-            docker logout
+          name: $(basename $PWD)-${{ job.environment }}-${{ github.run_id }}-artifact
+          path: .
+          retention-days: 1
+          
