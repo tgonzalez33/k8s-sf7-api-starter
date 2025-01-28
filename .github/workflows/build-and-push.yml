@@ -120,7 +120,7 @@ jobs:
       - name: Archive test artifact
         uses: actions/upload-artifact@v4
         with:
-          name: $(basename $PWD)-${{ vars.APP_ENV }}-${{ github.run_id }}-artifact
+          name: ${{ vars.ARTIFACT_ENV }}-${{ github.run_id }}-artifact
           path: .
           retention-days: 1
 
@@ -135,10 +135,35 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: $(basename $PWD)-${{ vars.ARTIFACT_ENV }}-${{ github.run_id }}-artifact
+          name: ${{ vars.ARTIFACT_ENV }}-${{ github.run_id }}-artifact
           path: .
 
-      # —— Composer 🧙‍️ —————————————————————————————————————————————————————————
+      # —— Symfony 🎵 ——————————————————————————————————————————————————————————
+      - name: Prepare .env file
+        run: |
+          echo "APP_ENV=${{ vars.APP_ENV }}" >> .env
+          echo "APP_DEBUG=${{ vars.APP_DEBUG }}" >> .env 
+          echo "APP_SECRET=$(openssl rand -hex 16)" >> .env 
+          echo "JWT_SECRET='${{ secrets.JWT_SECRET }}'" >> .env 
+          echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> .env 
+          echo "CORS_ALLOW_ORIGIN='${{ secrets.CORS_ALLOW_ORIGIN }}'" >> .env 
+       
+      - name: Set up MySQL environment
+        env:
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ vars.MYSQL_PORT }}
+          MYSQL_DB: "${{ secrets.MYSQL_DB }}"
+          MYSQL_VERSION: ${{ vars.MYSQL_VERSION }}
+          MYSQL_CHARSET: ${{ vars.MYSQL_CHARSET }}
+        run: |
+          echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DB?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> .env
+       
+      # —— Composer 🧙‍️ —————————————————————————————————————————————————————————  
+      - name: Remove dev dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --no-dev --optimize-autoloader
+
       - name: Modify composer.json to disable dotenv (k8s)
         run: |
           jq '.extra.symfony += {"disable-dotenv": true}' composer.json > composer_tmp.json
@@ -146,13 +171,11 @@ jobs:
 
       - name: Update composer.lock
         run: composer update
-    
-      - name: Remove dev dependencies
-        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --no-dev --optimize-autoloader
 
       - name: Validate composer.json and composer.lock
         run: composer validate
-        
+       
+      # —— Docker 🐳 ——————————————————————————————————————————————————————————
       - name: Log in to DockerHub
         uses: docker/login-action@v3
         with:
