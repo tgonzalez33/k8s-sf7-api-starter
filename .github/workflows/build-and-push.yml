@@ -138,9 +138,18 @@ jobs:
           name: $(basename $PWD)-${{ vars.ARTIFACT_ENV }}-${{ github.run_id }}-artifact
           path: .
 
+      # —— Composer 🧙‍️ —————————————————————————————————————————————————————————
+      - name: Modify composer.json to disable dotenv (k8s)
+        run: |
+          jq '.extra.symfony += {"disable-dotenv": true}' composer.json > composer_tmp.json
+          mv composer_tmp.json composer.json
+
       - name: Remove dev dependencies
         run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --no-dev --optimize-autoloader
 
+      - name: Validate composer.json and composer.lock
+        run: composer validate
+        
       - name: Log in to DockerHub
         uses: docker/login-action@v3
         with:
