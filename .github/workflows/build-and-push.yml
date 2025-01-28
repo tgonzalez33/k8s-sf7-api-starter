@@ -166,7 +166,7 @@ jobs:
 
       - name: Modify composer.json to disable dotenv (k8s)
         run: |
-          jq '.extra.symfony += {"disable-dotenv": true}' composer.json > composer_tmp.json
+          jq '.extra.runtime = {"disable_dotenv": true}' composer.json > composer_tmp.json
           mv composer_tmp.json composer.json
 
       - name: Update composer.lock
