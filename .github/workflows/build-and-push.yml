@@ -113,7 +113,7 @@ jobs:
           ./vendor/bin/phpunit
 
       # —— Artifact ——————————————————————————————————————————————————————————
-      - name: Delete .env
+      - name: Delete .env.test
         run: |
           rm -f .env.test
 
@@ -174,7 +174,11 @@ jobs:
 
       - name: Validate composer.json and composer.lock
         run: composer validate
-       
+      
+      - name: Delete .env
+        run: |
+          rm -f .env 
+      
       # —— Docker 🐳 ——————————————————————————————————————————————————————————
       - name: Log in to DockerHub
         uses: docker/login-action@v3
