@@ -25,6 +25,13 @@ Import project collection in POSTMAN (docs/SF7.postman_collection.json)
 
 Open your web browser and go to [SF7 default homepage](http://localhost:8182) and [PHPMyAdmin](http://localhost:8080)
 
+
+## Using act
+
+```bash
+act -W ./.github/workflows/build-and-push.yml --secret-file .secrets --var-file .vars
+```
+
 ## [!CAUTION]
 
 Please note this is a mini API demo, the code is neither **optimized** nor **too secure** but it will still do the job!
