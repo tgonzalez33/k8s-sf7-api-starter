@@ -142,14 +142,14 @@ jobs:
           path: .
 
       # —— Symfony 🎵 ——————————————————————————————————————————————————————————
-      - name: Prepare .env file
+      - name: Prepare github env
         run: |
-          echo "APP_ENV=${{ vars.APP_ENV }}" >> .env
-          echo "APP_DEBUG=${{ vars.APP_DEBUG }}" >> .env 
-          echo "APP_SECRET=$(openssl rand -hex 16)" >> .env 
-          echo "JWT_SECRET='${{ secrets.JWT_SECRET }}'" >> .env 
-          echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> .env 
-          echo "CORS_ALLOW_ORIGIN='${{ secrets.CORS_ALLOW_ORIGIN }}'" >> .env 
+          echo "APP_ENV=${{ vars.APP_ENV }}" >> $GITHUB_ENV
+          echo "APP_DEBUG=${{ vars.APP_DEBUG }}" >> $GITHUB_ENV 
+          echo "APP_SECRET=$(openssl rand -hex 16)" >> $GITHUB_ENV 
+          echo "JWT_SECRET='${{ secrets.JWT_SECRET }}'" >> $GITHUB_ENV 
+          echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> $GITHUB_ENV 
+          echo "CORS_ALLOW_ORIGIN='${{ secrets.CORS_ALLOW_ORIGIN }}'" >> $GITHUB_ENV 
        
       - name: Set up MySQL environment
         env:
@@ -161,7 +161,7 @@ jobs:
           MYSQL_VERSION: ${{ vars.MYSQL_VERSION }}
           MYSQL_CHARSET: ${{ vars.MYSQL_CHARSET }}
         run: |
-          echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DB?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> .env
+          echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DB?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> $GITHUB_ENV
        
       # —— Composer 🧙‍️ —————————————————————————————————————————————————————————  
       - name: Remove dev dependencies
