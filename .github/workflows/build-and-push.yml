@@ -70,16 +70,16 @@ jobs:
       # —— Symfony 🎵 ——————————————————————————————————————————————————————————
       - name: Prepare .env file
         run: |
-          echo "APP_ENV=${{ vars.APP_ENV }}" >> .env.test
-          echo "APP_DEBUG=${{ vars.APP_DEBUG }}" >> .env.test 
-          echo "APP_SECRET=$(openssl rand -hex 16)" >> .env.test 
-          echo "JWT_SECRET='${{ secrets.JWT_SECRET }}'" >> .env.test 
-          echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> .env.test 
-          echo "CORS_ALLOW_ORIGIN='${{ secrets.CORS_ALLOW_ORIGIN }}'" >> .env.test 
-          echo "KERNEL_CLASS='${{ vars.KERNEL_CLASS }}'" >> .env.test
-          echo "SYMFONY_DEPRECATIONS_HELPER=${{ vars.SYMFONY_DEPRECATIONS_HELPER }}" >> .env.test
-          echo "PANTHER_APP_ENV=${{ vars.PANTHER_APP_ENV }}" >> .env.test
-          echo "PANTHER_ERROR_SCREENSHOT_DIR=${{ vars.PANTHER_ERROR_SCREENSHOT_DIR }}" >> .env.test
+          echo "APP_ENV=${{ vars.APP_ENV }}" >> $GITHUB_ENV
+          echo "APP_DEBUG=${{ vars.APP_DEBUG }}" >> $GITHUB_ENV 
+          echo "APP_SECRET=$(openssl rand -hex 16)" >> $GITHUB_ENV 
+          echo "JWT_SECRET='${{ secrets.JWT_SECRET }}'" >> $GITHUB_ENV 
+          echo "MESSENGER_TRANSPORT_DSN=${{ secrets.MESSENGER_TRANSPORT_DSN }}" >> $GITHUB_ENV 
+          echo "CORS_ALLOW_ORIGIN='${{ secrets.CORS_ALLOW_ORIGIN }}'" >> $GITHUB_ENV 
+          echo "KERNEL_CLASS='${{ vars.KERNEL_CLASS }}'" >> $GITHUB_ENV
+          echo "SYMFONY_DEPRECATIONS_HELPER=${{ vars.SYMFONY_DEPRECATIONS_HELPER }}" >> $GITHUB_ENV
+          echo "PANTHER_APP_ENV=${{ vars.PANTHER_APP_ENV }}" >> $GITHUB_ENV
+          echo "PANTHER_ERROR_SCREENSHOT_DIR=${{ vars.PANTHER_ERROR_SCREENSHOT_DIR }}" >> $GITHUB_ENV
          
       - name: Set up MySQL environment
         env:
@@ -91,16 +91,16 @@ jobs:
           MYSQL_VERSION: ${{ vars.MYSQL_VERSION }}
           MYSQL_CHARSET: ${{ vars.MYSQL_CHARSET }}
         run: |
-          echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DB?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> .env.test
+          echo "DATABASE_URL=mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DB?serverVersion=$MYSQL_VERSION&charset=$MYSQL_CHARSET" >> $GITHUB_ENV
           
       - name: Check Symfony requirements
         run: symfony check:requirements
           
       - name: Check the Symfony version and environnements
-        run: php bin/console --env=${{ vars.APP_ENV }} --version
+        run: php bin/console --version
       
       - name: Run database migrations
-        run: php bin/console doctrine:migrations:migrate --env=${{ vars.APP_ENV }} --no-interaction
+        run: php bin/console doctrine:migrations:migrate --no-interaction
 
       - name: Static analysis of PHP code (PHPStan)
         run: |
@@ -113,10 +113,6 @@ jobs:
           ./vendor/bin/phpunit
 
       # —— Artifact ——————————————————————————————————————————————————————————
-      - name: Delete .env.test
-        run: |
-          rm -f .env.test
-
       - name: Archive test artifact
         uses: actions/upload-artifact@v4
         with:
@@ -177,11 +173,7 @@ jobs:
 
       - name: Validate composer.json and composer.lock
         run: composer validate
-      
-      - name: Delete .env
-        run: |
-          rm -f .env 
-      
+
       # —— Docker 🐳 ——————————————————————————————————————————————————————————
       - name: Log in to DockerHub
         uses: docker/login-action@v3
@@ -189,7 +181,7 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
         
-      - name: Build Docker image without .env
+      - name: Build Docker image
         run: |
           DOCKER_REPO_PATH=${{ secrets.DOCKER_HUB_USERNAME }}/${{ secrets.DOCKER_HUB_REPOSITORY }}
           docker build -t $DOCKER_REPO_PATH:latest -t $DOCKER_REPO_PATH:${{ github.sha }} .
